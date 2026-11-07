@@ -27,6 +27,9 @@ a { color: inherit; text-decoration: none; }
 .app-shell { min-height: 100vh; display: flex; flex-direction: column; }
 .page-shell { width: min(1120px, calc(100% - 48px)); margin: 0 auto; flex: 1; padding: 48px 0 72px; }
 .site-footer { width: min(1120px, calc(100% - 48px)); min-height: 76px; margin: 0 auto; display: flex; align-items: center; gap: 12px; color: #98a1ac; font-size: 12px; border-top: 1px solid var(--line); }
+.pwa-notice { position: fixed; z-index: 50; right: 20px; bottom: max(20px, env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 10px; width: min(480px, calc(100% - 32px)); padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: white; box-shadow: 0 14px 40px rgba(31, 42, 59, .16); }
+.pwa-notice-message { flex: 1; margin: 0; color: var(--ink); font-size: 13px; line-height: 1.5; }
+.pwa-notice-action { min-height: 40px; padding: 9px 13px; font-size: 12px; }
 .brand-mark { width: 34px; height: 34px; display: inline-grid; place-items: center; border-radius: 12px; background: var(--purple); color: white; font: 800 21px 'Manrope', sans-serif; }
 .brand-mark-small { width: 25px; height: 25px; font-size: 15px; border-radius: 8px; }
 .footer-note { margin-left: auto; }
@@ -218,6 +221,8 @@ h3 { font-size: 16px; margin-bottom: 8px; }
 .voice-translation-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 10px; border-top: 1px solid rgba(112, 94, 204, .12); }
 .voice-action-button { display: grid; place-items: center; min-width: 40px; height: 40px; padding: 0; color: #6554ce; }
 .voice-action-button:disabled { cursor: not-allowed; opacity: .45; }
+.playback-status { margin: 8px 0 0; color: #5946d1; font-size: 11px; line-height: 1.5; }
+.playback-error { color: #b83e52; }
 .translation-loading { width: 17px; height: 17px; border: 2px solid #ded9ff; border-top-color: var(--purple); border-radius: 50%; animation: translation-spin .75s linear infinite; }
 @keyframes translation-spin { to { transform: rotate(360deg); } }
 .voice-status { margin: 12px 2px 0; font-size: 13px; }
@@ -317,6 +322,8 @@ h3 { font-size: 16px; margin-bottom: 8px; }
   .settings-panel { padding: 18px; }
   .translator-actions { align-items: flex-start; }
   .translator-actions .button { padding: 11px 13px; }
+  .pwa-notice { right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); width: calc(100% - 24px); gap: 7px; padding: 11px; }
+  .pwa-notice-action { min-height: 38px; padding: 8px 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

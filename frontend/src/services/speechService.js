@@ -1,7 +1,44 @@
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition
+let speechRequestId = 0
 
 export function isSpeechRecognitionSupported() {
   return Boolean(Recognition)
+}
+
+function getSpeechSynthesis() {
+  if (!('speechSynthesis' in window)) {
+    throw new Error('Speech playback is not supported in this browser.')
+  }
+  return window.speechSynthesis
+}
+
+function getVoices(synthesis) {
+  const voices = synthesis.getVoices()
+  if (voices.length) return Promise.resolve(voices)
+
+  return new Promise((resolve) => {
+    let timeout
+    const finish = () => {
+      clearTimeout(timeout)
+      synthesis.removeEventListener('voiceschanged', finish)
+      resolve(synthesis.getVoices())
+    }
+
+    synthesis.addEventListener('voiceschanged', finish, { once: true })
+    timeout = setTimeout(finish, 1500)
+  })
+}
+
+function findCompatibleVoice(voices, language) {
+  const requestedLocale = language.toLowerCase().replaceAll('_', '-')
+  const requestedLanguage = requestedLocale.split('-')[0]
+  return voices.find((voice) => voice.lang.toLowerCase().replaceAll('_', '-') === requestedLocale)
+    || voices.find((voice) => voice.lang.toLowerCase().replaceAll('_', '-').split('-')[0] === requestedLanguage)
+}
+
+export function stopSpeaking() {
+  speechRequestId += 1
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel()
 }
 
 export async function requestMicrophonePermission() {
@@ -109,10 +146,40 @@ export function startListening({ language, onResult, onError, onEnd }) {
   return recognition
 }
 
-export function speakText(text, language) {
-  if (!('speechSynthesis' in window)) throw new Error('Speech playback is not supported in this browser.')
-  window.speechSynthesis.cancel()
-  const utterance = new SpeechSynthesisUtterance(text)
+export async function speakText(text, language, { onStart, onEnd, onError } = {}) {
+  const spokenText = text.trim()
+  if (!spokenText) throw new Error('There is no translated text to play yet.')
+
+  const synthesis = getSpeechSynthesis()
+  synthesis.cancel()
+  const requestId = ++speechRequestId
+  const voices = await getVoices(synthesis)
+  if (requestId !== speechRequestId) return
+
+  const voice = findCompatibleVoice(voices, language)
+  if (!voice) {
+    const languageName = language.split('-')[0].toLowerCase() === 'rw'
+      ? 'Kinyarwanda'
+      : new Intl.DisplayNames(['en'], { type: 'language' }).of(language.split('-')[0]) || language
+    throw new Error(`No compatible ${languageName} speech voice (${language}) is installed or available on this device.`)
+  }
+
+  const utterance = new SpeechSynthesisUtterance(spokenText)
   utterance.lang = language
-  window.speechSynthesis.speak(utterance)
+  utterance.voice = voice
+  utterance.onstart = () => {
+    if (requestId === speechRequestId) onStart?.()
+  }
+  utterance.onend = () => {
+    if (requestId === speechRequestId) onEnd?.()
+  }
+  utterance.onerror = (event) => {
+    if (requestId === speechRequestId) {
+      const error = new Error(event.error === 'canceled' || event.error === 'interrupted'
+        ? 'Speech playback was stopped.'
+        : `Speech playback failed${event.error ? `: ${event.error}` : ''}.`)
+      onError?.(error)
+    }
+  }
+  synthesis.speak(utterance)
 }

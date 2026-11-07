@@ -1,5 +1,6 @@
 <script setup>
 import Navbar from './components/Navbar.vue'
+import PwaUpdatePrompt from './components/PwaUpdatePrompt.vue'
 </script>
 
 <template>
@@ -13,5 +14,6 @@ import Navbar from './components/Navbar.vue'
       <span>TalkBridge · Make every conversation count.</span>
       <span class="footer-note">Your voice, understood.</span>
     </footer>
+    <PwaUpdatePrompt />
   </div>
 </template>

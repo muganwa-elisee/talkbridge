@@ -1,8 +1,8 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { ArrowLeftRight, Check, Copy, Mic, Volume2 } from 'lucide-vue-next'
+import { ArrowLeftRight, Check, Copy, Mic, Square, Volume2 } from 'lucide-vue-next'
 import LanguageSelector from '../components/LanguageSelector.vue'
-import { isSpeechRecognitionSupported, monitorMicrophone, requestMicrophonePermission, speakText, startListening } from '../services/speechService'
+import { isSpeechRecognitionSupported, monitorMicrophone, requestMicrophonePermission, speakText, startListening, stopSpeaking } from '../services/speechService'
 import { translateText } from '../services/translationService'
 
 const sourceLanguage = ref('fr')
@@ -17,13 +17,18 @@ const microphoneHasSignal = ref(false)
 const microphoneMeterAvailable = ref(true)
 const copied = ref(false)
 const serviceConnected = ref(false)
+const speechPlaying = ref(false)
+const speechPreparing = ref(false)
 const status = ref('')
+const speechStatus = ref('')
+const speechError = ref('')
 const error = ref('')
 let recognition
 let microphoneStream
 let stopMicrophoneMonitor
 let translationTimer
 let translationRequestId = 0
+let speechPlaybackRequestId = 0
 let copyTimer
 let recognitionRestartTimer
 let stopRequested = false
@@ -115,6 +120,14 @@ async function translate(textToTranslate, requestId) {
 
 watch([input, sourceLanguage, targetLanguage], ([text]) => {
   clearTimeout(translationTimer)
+  if (speechPlaying.value || speechPreparing.value) {
+    speechPlaybackRequestId += 1
+    stopSpeaking()
+    speechPlaying.value = false
+    speechPreparing.value = false
+    speechStatus.value = 'Playback stopped because the phrase or language changed.'
+  }
+  speechError.value = ''
   const requestId = ++translationRequestId
   error.value = ''
   output.value = ''
@@ -273,12 +286,54 @@ async function copyOutput() {
 }
 
 function playOutput() {
-  try {
-    speakText(output.value, targetLocale.value)
-    error.value = ''
-  } catch (speechError) {
-    error.value = speechError.message
+  if (!output.value.trim()) {
+    speechStatus.value = ''
+    speechError.value = 'There is no translated text to play yet.'
+    return
   }
+
+  const requestId = ++speechPlaybackRequestId
+  speechError.value = ''
+  speechPlaying.value = false
+  speechPreparing.value = true
+  speechStatus.value = `Finding a ${targetLanguageName.value} voice…`
+
+  void speakText(output.value, targetLocale.value, {
+    onStart: () => {
+      if (requestId !== speechPlaybackRequestId) return
+      speechPreparing.value = false
+      speechPlaying.value = true
+      speechStatus.value = `Playing ${targetLanguageName.value} translation.`
+    },
+    onEnd: () => {
+      if (requestId !== speechPlaybackRequestId) return
+      speechPreparing.value = false
+      speechPlaying.value = false
+      speechStatus.value = 'Playback finished.'
+    },
+    onError: (playbackError) => {
+      if (requestId !== speechPlaybackRequestId) return
+      speechPreparing.value = false
+      speechPlaying.value = false
+      speechStatus.value = ''
+      speechError.value = playbackError.message
+    },
+  }).catch((playbackError) => {
+    if (requestId !== speechPlaybackRequestId) return
+    speechPreparing.value = false
+    speechPlaying.value = false
+    speechStatus.value = ''
+    speechError.value = playbackError.message
+  })
+}
+
+function stopTranslationPlayback() {
+  speechPlaybackRequestId += 1
+  stopSpeaking()
+  speechPreparing.value = false
+  speechPlaying.value = false
+  speechError.value = ''
+  speechStatus.value = 'Playback stopped.'
 }
 
 onBeforeUnmount(() => {
@@ -287,6 +342,8 @@ onBeforeUnmount(() => {
   clearTimeout(copyTimer)
   clearTimeout(recognitionRestartTimer)
   translationRequestId += 1
+  speechPlaybackRequestId += 1
+  stopSpeaking()
   recognition?.stop()
   releaseMicrophone()
 })
@@ -413,8 +470,12 @@ onBeforeUnmount(() => {
         <div class="voice-translation-actions">
           <span class="voice-input-help">{{ output ? 'Translation from the connected service' : 'Waiting for your phrase' }}</span>
           <div class="action-group">
-            <button class="icon-button voice-action-button" type="button" :disabled="!output" aria-label="Play translation aloud" @click="playOutput">
-              <Volume2 :size="17" aria-hidden="true" />
+            <button class="icon-button voice-action-button" type="button" :disabled="speechPlaying || speechPreparing" aria-label="Play translation aloud" @click="playOutput">
+              <Volume2 v-if="!speechPlaying && !speechPreparing" :size="17" aria-hidden="true" />
+              <span v-else class="translation-loading" aria-hidden="true"></span>
+            </button>
+            <button v-if="speechPlaying || speechPreparing" class="icon-button voice-action-button" type="button" aria-label="Stop speech playback" @click="stopTranslationPlayback">
+              <Square :size="15" aria-hidden="true" />
             </button>
             <button class="icon-button voice-action-button" type="button" :disabled="!output" :aria-label="copied ? 'Translation copied' : 'Copy translation'" @click="copyOutput">
               <Check v-if="copied" :size="17" aria-hidden="true" />
@@ -422,6 +483,8 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </div>
+        <p v-if="speechStatus" class="playback-status" role="status" aria-live="polite">{{ speechStatus }}</p>
+        <p v-if="speechError" class="playback-status playback-error" role="alert">{{ speechError }}</p>
       </article>
     </div>
 
