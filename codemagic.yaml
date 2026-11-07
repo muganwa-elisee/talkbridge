@@ -8,7 +8,6 @@ workflows:
     environment:
       node: v22.11.0
       xcode: latest
-      cocoapods: default
 
     scripts:
       - name: Install frontend dependencies
@@ -26,16 +25,11 @@ workflows:
           cd frontend
           npx cap sync ios
 
-      - name: Install iOS dependencies
-        script: |
-          cd frontend/ios/App
-          pod install
-
       - name: Build unsigned iOS application
         script: |
           cd frontend/ios/App
           xcodebuild \
-            -workspace App.xcworkspace \
+            -project App.xcodeproj \
             -scheme App \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
